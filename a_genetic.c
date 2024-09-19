@@ -46,15 +46,52 @@ void gerar_individuo_aleatorio(int *individuo) {
     }
 }
 
-// Função de fitness (avalia o número de câmeras e cobertura das arestas)
-int calcular_fitness(int *individuo) {
-    int arestas_cobertas = 0;
-    int num_cameras = 0;
+// Verificar se todas as arestas estão cobertas
+int solucao_valida(int *individuo) {
+    for (int i = 0; i < NUM_ARESTAS; i++) {
+        int v1 = arestas[i][0];
+        int v2 = arestas[i][1];
+        if (individuo[v1] == 0 && individuo[v2] == 0) {
+            return 0;  // Aresta não está coberta
+        }
+    }
+    return 1;  // Todas as arestas estão cobertas
+}
 
-    // Contar o número de câmeras usadas
+// Função para ajustar soluções para garantir que todas as arestas estejam cobertas
+void ajustar_solucao(int *individuo) {
+    for (int i = 0; i < NUM_ARESTAS; i++) {
+        int v1 = arestas[i][0];
+        int v2 = arestas[i][1];
+        if (individuo[v1] == 0 && individuo[v2] == 0) {
+            // Se a aresta não está coberta, adicionar câmeras
+            individuo[v1] = 1;
+            individuo[v2] = 1;
+        }
+    }
+}
+
+// Função para remover câmeras redundantes
+void remover_redundantes(int *individuo) {
     for (int i = 0; i < NUM_VERTICES; i++) {
         if (individuo[i] == 1) {
-            num_cameras++;
+            individuo[i] = 0;  // Tentar remover a câmera
+            if (!solucao_valida(individuo)) {
+                individuo[i] = 1;  // Voltar a câmera se a solução ficou inválida
+            }
+        }
+    }
+}
+
+// Função de fitness (avalia o número de câmeras e cobertura das arestas)
+int calcular_fitness(int *individuo) {
+    int custo_total = 0;
+    int arestas_cobertas = 0;
+
+    // Contar o número de câmeras usadas e o custo associado
+    for (int i = 0; i < NUM_VERTICES; i++) {
+        if (individuo[i] == 1) {
+            custo_total += pesos[i];  // Usar o peso (custo) do vértice
         }
     }
 
@@ -69,15 +106,17 @@ int calcular_fitness(int *individuo) {
 
     // Penalizar soluções que não cobrem todas as arestas
     if (arestas_cobertas == NUM_ARESTAS) {
-        return num_cameras;  // Quanto menos câmeras, melhor o fitness
+        return custo_total;  // Quanto menor o custo, melhor
     } else {
-        return num_cameras + (NUM_ARESTAS - arestas_cobertas) * 10;  // Penalidade por arestas não cobertas
+        return custo_total + (NUM_ARESTAS - arestas_cobertas) * 10;  // Penalidade por arestas não cobertas
     }
 }
 
 // Função para avaliar a população
 void avaliar_populacao(int populacao[TAM_POPULACAO][MAX_VERTICES], int fitness[TAM_POPULACAO]) {
     for (int i = 0; i < TAM_POPULACAO; i++) {
+        ajustar_solucao(populacao[i]);  // Garantir cobertura
+        remover_redundantes(populacao[i]);  // Remover câmeras desnecessárias
         fitness[i] = calcular_fitness(populacao[i]);
     }
 }
@@ -89,17 +128,17 @@ int selecionar_individuo(int fitness[TAM_POPULACAO]) {
     return (fitness[ind1] < fitness[ind2]) ? ind1 : ind2;
 }
 
-// Função de cruzamento (crossover de um ponto)
-void cruzar_individuos(int pai1[MAX_VERTICES], int pai2[MAX_VERTICES], int filho1[MAX_VERTICES], int filho2[MAX_VERTICES]) {
-    int ponto_de_cruzamento = rand() % NUM_VERTICES;
-
-    for (int i = 0; i < ponto_de_cruzamento; i++) {
-        filho1[i] = pai1[i];
-        filho2[i] = pai2[i];
-    }
-    for (int i = ponto_de_cruzamento; i < NUM_VERTICES; i++) {
-        filho1[i] = pai2[i];
-        filho2[i] = pai1[i];
+// Função de cruzamento (crossover baseado em fitness)
+void cruzar_baseado_fitness(int pai1[MAX_VERTICES], int pai2[MAX_VERTICES], int filho1[MAX_VERTICES], int filho2[MAX_VERTICES], int fitness_pai1, int fitness_pai2) {
+    for (int i = 0; i < NUM_VERTICES; i++) {
+        // Probabilidade proporcional ao fitness dos pais
+        if ((rand() / (float)RAND_MAX) < ((float)fitness_pai1 / (fitness_pai1 + fitness_pai2))) {
+            filho1[i] = pai1[i];
+            filho2[i] = pai2[i];
+        } else {
+            filho1[i] = pai2[i];
+            filho2[i] = pai1[i];
+        }
     }
 }
 
@@ -121,7 +160,7 @@ void nova_geracao(int populacao[TAM_POPULACAO][MAX_VERTICES], int fitness[TAM_PO
         int pai2 = selecionar_individuo(fitness);
 
         // Cruzamento e criação dos filhos
-        cruzar_individuos(populacao[pai1], populacao[pai2], nova_populacao[i], nova_populacao[i+1]);
+        cruzar_baseado_fitness(populacao[pai1], populacao[pai2], nova_populacao[i], nova_populacao[i+1], fitness[pai1], fitness[pai2]);
 
         // Aplicar mutação nos filhos
         mutar_individuo(nova_populacao[i], TAXA_MUTACAO);
@@ -171,4 +210,3 @@ int main() {
 
     return 0;
 }
-
