@@ -4,8 +4,8 @@
 
 #define MAX_VERTICES 100  // Limite máximo para o número de vértices
 #define MAX_ARESTAS 200   // Limite máximo para o número de arestas
-#define TAM_POPULACAO 10  // Tamanho da população
-#define NUM_GERACOES 100  // Número de gerações para o algoritmo genético
+#define TAM_POPULACAO 10  // Tamanho da população (você pode testar diferentes valores)
+#define NUM_GERACOES 100  // Número de gerações para o algoritmo genético (você pode testar diferentes valores)
 #define TAXA_MUTACAO 0.05 // Taxa de mutação
 
 int NUM_VERTICES;  // Número de nós (será lido do arquivo)
@@ -46,43 +46,6 @@ void gerar_individuo_aleatorio(int *individuo) {
     }
 }
 
-// Verificar se todas as arestas estão cobertas
-int solucao_valida(int *individuo) {
-    for (int i = 0; i < NUM_ARESTAS; i++) {
-        int v1 = arestas[i][0];
-        int v2 = arestas[i][1];
-        if (individuo[v1] == 0 && individuo[v2] == 0) {
-            return 0;  // Aresta não está coberta
-        }
-    }
-    return 1;  // Todas as arestas estão cobertas
-}
-
-// Função para ajustar soluções para garantir que todas as arestas estejam cobertas
-void ajustar_solucao(int *individuo) {
-    for (int i = 0; i < NUM_ARESTAS; i++) {
-        int v1 = arestas[i][0];
-        int v2 = arestas[i][1];
-        if (individuo[v1] == 0 && individuo[v2] == 0) {
-            // Se a aresta não está coberta, adicionar câmeras
-            individuo[v1] = 1;
-            individuo[v2] = 1;
-        }
-    }
-}
-
-// Função para remover câmeras redundantes
-void remover_redundantes(int *individuo) {
-    for (int i = 0; i < NUM_VERTICES; i++) {
-        if (individuo[i] == 1) {
-            individuo[i] = 0;  // Tentar remover a câmera
-            if (!solucao_valida(individuo)) {
-                individuo[i] = 1;  // Voltar a câmera se a solução ficou inválida
-            }
-        }
-    }
-}
-
 // Função de fitness (avalia o número de câmeras e cobertura das arestas)
 int calcular_fitness(int *individuo) {
     int custo_total = 0;
@@ -115,8 +78,6 @@ int calcular_fitness(int *individuo) {
 // Função para avaliar a população
 void avaliar_populacao(int populacao[TAM_POPULACAO][MAX_VERTICES], int fitness[TAM_POPULACAO]) {
     for (int i = 0; i < TAM_POPULACAO; i++) {
-        ajustar_solucao(populacao[i]);  // Garantir cobertura
-        remover_redundantes(populacao[i]);  // Remover câmeras desnecessárias
         fitness[i] = calcular_fitness(populacao[i]);
     }
 }
@@ -128,17 +89,17 @@ int selecionar_individuo(int fitness[TAM_POPULACAO]) {
     return (fitness[ind1] < fitness[ind2]) ? ind1 : ind2;
 }
 
-// Função de cruzamento (crossover baseado em fitness)
-void cruzar_baseado_fitness(int pai1[MAX_VERTICES], int pai2[MAX_VERTICES], int filho1[MAX_VERTICES], int filho2[MAX_VERTICES], int fitness_pai1, int fitness_pai2) {
-    for (int i = 0; i < NUM_VERTICES; i++) {
-        // Probabilidade proporcional ao fitness dos pais
-        if ((rand() / (float)RAND_MAX) < ((float)fitness_pai1 / (fitness_pai1 + fitness_pai2))) {
-            filho1[i] = pai1[i];
-            filho2[i] = pai2[i];
-        } else {
-            filho1[i] = pai2[i];
-            filho2[i] = pai1[i];
-        }
+// Função de cruzamento (crossover de um ponto)
+void cruzar_individuos(int pai1[MAX_VERTICES], int pai2[MAX_VERTICES], int filho1[MAX_VERTICES], int filho2[MAX_VERTICES]) {
+    int ponto_de_cruzamento = rand() % NUM_VERTICES;
+
+    for (int i = 0; i < ponto_de_cruzamento; i++) {
+        filho1[i] = pai1[i];
+        filho2[i] = pai2[i];
+    }
+    for (int i = ponto_de_cruzamento; i < NUM_VERTICES; i++) {
+        filho1[i] = pai2[i];
+        filho2[i] = pai1[i];
     }
 }
 
@@ -160,7 +121,7 @@ void nova_geracao(int populacao[TAM_POPULACAO][MAX_VERTICES], int fitness[TAM_PO
         int pai2 = selecionar_individuo(fitness);
 
         // Cruzamento e criação dos filhos
-        cruzar_baseado_fitness(populacao[pai1], populacao[pai2], nova_populacao[i], nova_populacao[i+1], fitness[pai1], fitness[pai2]);
+        cruzar_individuos(populacao[pai1], populacao[pai2], nova_populacao[i], nova_populacao[i+1]);
 
         // Aplicar mutação nos filhos
         mutar_individuo(nova_populacao[i], TAXA_MUTACAO);
@@ -175,6 +136,11 @@ void nova_geracao(int populacao[TAM_POPULACAO][MAX_VERTICES], int fitness[TAM_PO
     }
 }
 
+// Função para medir o tempo de execução
+double medir_tempo(clock_t inicio, clock_t fim) {
+    return (double)(fim - inicio) / CLOCKS_PER_SEC;
+}
+
 int main() {
     srand(time(NULL));  // Semente para geração de números aleatórios
 
@@ -184,6 +150,17 @@ int main() {
     // Definir a população e fitness
     int populacao[TAM_POPULACAO][MAX_VERTICES];
     int fitness[TAM_POPULACAO];
+
+    // Arquivo para registrar os dados do fitness por geração
+    FILE *arquivo_dados = fopen("fitness_data.csv", "w");
+    if (arquivo_dados == NULL) {
+        printf("Erro ao abrir arquivo para salvar dados!\n");
+        return 1;
+    }
+    fprintf(arquivo_dados, "Geração,Melhor Fitness\n");
+
+    // Medir o tempo de execução
+    clock_t inicio = clock();
 
     // Gerar a população inicial
     for (int i = 0; i < TAM_POPULACAO; i++) {
@@ -195,18 +172,31 @@ int main() {
         // Avaliar a população
         avaliar_populacao(populacao, fitness);
 
-        // Exibir o melhor fitness da geração atual
+        // Encontrar o melhor fitness da geração atual
         int melhor_fitness = fitness[0];
         for (int i = 1; i < TAM_POPULACAO; i++) {
             if (fitness[i] < melhor_fitness) {
                 melhor_fitness = fitness[i];
             }
         }
+
+        // Registrar o melhor fitness no arquivo
+        fprintf(arquivo_dados, "%d,%d\n", geracao, melhor_fitness);
+
+        // Exibir o melhor fitness da geração atual no terminal
         printf("Geração %d - Melhor fitness: %d\n", geracao, melhor_fitness);
 
         // Gerar nova geração
         nova_geracao(populacao, fitness);
     }
+
+    // Fechar o arquivo de dados
+    fclose(arquivo_dados);
+
+    // Medir o tempo total de execução
+    clock_t fim = clock();
+    double tempo_total = medir_tempo(inicio, fim);
+    printf("Tempo total de execução: %.2f segundos\n", tempo_total);
 
     return 0;
 }
