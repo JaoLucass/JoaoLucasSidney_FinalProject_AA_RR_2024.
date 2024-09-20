@@ -1,202 +1,157 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <time.h>
 
-#define MAX_VERTICES 100  // Limite máximo para o número de vértices
-#define MAX_ARESTAS 200   // Limite máximo para o número de arestas
-#define TAM_POPULACAO 10  // Tamanho da população (você pode testar diferentes valores)
-#define NUM_GERACOES 100  // Número de gerações para o algoritmo genético (você pode testar diferentes valores)
+#define MAX_VERTICES 100  // Número máximo de dimensões/vértices
+#define TAM_POPULACAO 10  // Tamanho da população
+#define NUM_GERACOES 100  // Número de gerações
 #define TAXA_MUTACAO 0.05 // Taxa de mutação
+#define PI 3.14159265358979323846
 
-int NUM_VERTICES;  // Número de nós (será lido do arquivo)
-int NUM_ARESTAS;   // Número de arestas (será lido do arquivo)
-int pesos[MAX_VERTICES];  // Lista de pesos dos nós
-int arestas[MAX_ARESTAS][2];  // Lista de arestas (conexões entre nós)
-
-// Função para ler o arquivo de população gerado
-void ler_arquivo_populacao(const char* nome_arquivo) {
-    FILE *arquivo = fopen(nome_arquivo, "r");
-    if (arquivo == NULL) {
-        printf("Erro ao abrir o arquivo!\n");
-        return;
+// Funções de Benchmark
+double sphere_function(double *x, int n) {
+    double sum = 0.0;
+    for (int i = 0; i < n; i++) {
+        sum += x[i] * x[i];
     }
-
-    // Ler número de vértices e arestas
-    fscanf(arquivo, "%d", &NUM_VERTICES);
-    fscanf(arquivo, "%d", &NUM_ARESTAS);
-
-    // Ler pesos dos vértices
-    for (int i = 0; i < NUM_VERTICES; i++) {
-        fscanf(arquivo, "%d %d", &i, &pesos[i]);
-    }
-
-    // Ler arestas
-    for (int i = 0; i < NUM_ARESTAS; i++) {
-        fscanf(arquivo, "%d %d", &arestas[i][0], &arestas[i][1]);
-    }
-
-    fclose(arquivo);
-    printf("Arquivo de população lido com sucesso.\n");
+    return sum;
 }
 
-// Função para gerar uma solução inicial aleatória
-void gerar_individuo_aleatorio(int *individuo) {
-    for (int i = 0; i < NUM_VERTICES; i++) {
-        individuo[i] = rand() % 2;  // 0 ou 1 para indicar se uma câmera será instalada
+double rosenbrock_function(double *x, int n) {
+    double sum = 0.0;
+    for (int i = 0; i < n - 1; i++) {
+        sum += 100.0 * pow((x[i + 1] - x[i] * x[i]), 2) + pow((1 - x[i]), 2);
     }
+    return sum;
 }
 
-// Função de fitness (avalia o número de câmeras e cobertura das arestas)
-int calcular_fitness(int *individuo) {
-    int custo_total = 0;
-    int arestas_cobertas = 0;
-
-    // Contar o número de câmeras usadas e o custo associado
-    for (int i = 0; i < NUM_VERTICES; i++) {
-        if (individuo[i] == 1) {
-            custo_total += pesos[i];  // Usar o peso (custo) do vértice
-        }
+double rastrigin_function(double *x, int n) {
+    double sum = 10 * n;
+    for (int i = 0; i < n; i++) {
+        sum += (x[i] * x[i]) - 10 * cos(2 * PI * x[i]);
     }
+    return sum;
+}
 
-    // Verificar se cada aresta está coberta por uma câmera
-    for (int i = 0; i < NUM_ARESTAS; i++) {
-        int v1 = arestas[i][0];
-        int v2 = arestas[i][1];
-        if (individuo[v1] == 1 || individuo[v2] == 1) {
-            arestas_cobertas++;
-        }
+double ackley_function(double *x, int n) {
+    double sum1 = 0.0;
+    double sum2 = 0.0;
+    for (int i = 0; i < n; i++) {
+        sum1 += x[i] * x[i];
+        sum2 += cos(2 * PI * x[i]);
     }
+    return -20 * exp(-0.2 * sqrt(sum1 / n)) - exp(sum2 / n) + 20 + exp(1);
+}
 
-    // Penalizar soluções que não cobrem todas as arestas
-    if (arestas_cobertas == NUM_ARESTAS) {
-        return custo_total;  // Quanto menor o custo, melhor
-    } else {
-        return custo_total + (NUM_ARESTAS - arestas_cobertas) * 10;  // Penalidade por arestas não cobertas
+// Função para gerar um indivíduo aleatório para funções de benchmark
+void gerar_individuo_benchmark(double *individuo, int n, double min, double max) {
+    for (int i = 0; i < n; i++) {
+        individuo[i] = min + ((double)rand() / RAND_MAX) * (max - min);  // Gera números entre [min, max]
     }
 }
 
-// Função para avaliar a população
-void avaliar_populacao(int populacao[TAM_POPULACAO][MAX_VERTICES], int fitness[TAM_POPULACAO]) {
-    for (int i = 0; i < TAM_POPULACAO; i++) {
-        fitness[i] = calcular_fitness(populacao[i]);
+// Função de avaliação de fitness usando diferentes funções de benchmark
+double calcular_fitness_benchmark(double *individuo, int n, int tipo_funcao) {
+    switch (tipo_funcao) {
+        case 1:
+            return sphere_function(individuo, n);
+        case 2:
+            return rosenbrock_function(individuo, n);
+        case 3:
+            return rastrigin_function(individuo, n);
+        case 4:
+            return ackley_function(individuo, n);
+        default:
+            return sphere_function(individuo, n);  // Função padrão
     }
 }
 
-// Função de seleção (torneio simples)
-int selecionar_individuo(int fitness[TAM_POPULACAO]) {
-    int ind1 = rand() % TAM_POPULACAO;
-    int ind2 = rand() % TAM_POPULACAO;
-    return (fitness[ind1] < fitness[ind2]) ? ind1 : ind2;
-}
-
-// Função de cruzamento (crossover de um ponto)
-void cruzar_individuos(int pai1[MAX_VERTICES], int pai2[MAX_VERTICES], int filho1[MAX_VERTICES], int filho2[MAX_VERTICES]) {
-    int ponto_de_cruzamento = rand() % NUM_VERTICES;
+// Função de crossover (um ponto)
+void cruzar_individuos(double *pai1, double *pai2, double *filho1, double *filho2, int n) {
+    int ponto_de_cruzamento = rand() % n;
 
     for (int i = 0; i < ponto_de_cruzamento; i++) {
         filho1[i] = pai1[i];
         filho2[i] = pai2[i];
     }
-    for (int i = ponto_de_cruzamento; i < NUM_VERTICES; i++) {
+    for (int i = ponto_de_cruzamento; i < n; i++) {
         filho1[i] = pai2[i];
         filho2[i] = pai1[i];
     }
 }
 
 // Função de mutação
-void mutar_individuo(int individuo[MAX_VERTICES], float taxa_mutacao) {
-    for (int i = 0; i < NUM_VERTICES; i++) {
-        if ((rand() / (float)RAND_MAX) < taxa_mutacao) {
-            individuo[i] = 1 - individuo[i];  // Inverte o gene (0 -> 1 ou 1 -> 0)
+void mutar_individuo(double *individuo, int n, double taxa_mutacao, double min, double max) {
+    for (int i = 0; i < n; i++) {
+        if ((rand() / (double)RAND_MAX) < taxa_mutacao) {
+            individuo[i] = min + ((double)rand() / RAND_MAX) * (max - min);  // Mutar com valor aleatório no intervalo [min, max]
         }
     }
 }
 
-// Função para gerar a nova geração
-void nova_geracao(int populacao[TAM_POPULACAO][MAX_VERTICES], int fitness[TAM_POPULACAO]) {
-    int nova_populacao[TAM_POPULACAO][MAX_VERTICES];
-
-    for (int i = 0; i < TAM_POPULACAO; i += 2) {
-        int pai1 = selecionar_individuo(fitness);
-        int pai2 = selecionar_individuo(fitness);
-
-        // Cruzamento e criação dos filhos
-        cruzar_individuos(populacao[pai1], populacao[pai2], nova_populacao[i], nova_populacao[i+1]);
-
-        // Aplicar mutação nos filhos
-        mutar_individuo(nova_populacao[i], TAXA_MUTACAO);
-        mutar_individuo(nova_populacao[i+1], TAXA_MUTACAO);
-    }
-
-    // Substituir a população antiga pela nova
-    for (int i = 0; i < TAM_POPULACAO; i++) {
-        for (int j = 0; j < NUM_VERTICES; j++) {
-            populacao[i][j] = nova_populacao[i][j];
-        }
-    }
-}
-
-// Função para medir o tempo de execução
-double medir_tempo(clock_t inicio, clock_t fim) {
-    return (double)(fim - inicio) / CLOCKS_PER_SEC;
+// Função de seleção (torneio simples)
+int selecionar_individuo(double *fitness, int tamanho_populacao) {
+    int ind1 = rand() % tamanho_populacao;
+    int ind2 = rand() % tamanho_populacao;
+    return (fitness[ind1] < fitness[ind2]) ? ind1 : ind2;
 }
 
 int main() {
-    srand(time(NULL));  // Semente para geração de números aleatórios
+    srand(time(NULL));  // Semente para gerar números aleatórios
 
-    // Ler o arquivo de população gerado anteriormente
-    ler_arquivo_populacao("populacao.txt");
-
-    // Definir a população e fitness
-    int populacao[TAM_POPULACAO][MAX_VERTICES];
-    int fitness[TAM_POPULACAO];
-
-    // Arquivo para registrar os dados do fitness por geração
-    FILE *arquivo_dados = fopen("fitness_data.csv", "w");
-    if (arquivo_dados == NULL) {
-        printf("Erro ao abrir arquivo para salvar dados!\n");
-        return 1;
-    }
-    fprintf(arquivo_dados, "Geração,Melhor Fitness\n");
-
-    // Medir o tempo de execução
-    clock_t inicio = clock();
+    int n = 5;  // Dimensão do problema (número de vértices ou variáveis)
+    double min = -5.12;  // Limite inferior do intervalo
+    double max = 5.12;   // Limite superior do intervalo
+    int tipo_funcao = 3; // Função de benchmark a ser usada (1: Sphere, 2: Rosenbrock, 3: Rastrigin, 4: Ackley)
+    
+    double populacao[TAM_POPULACAO][n];
+    double nova_populacao[TAM_POPULACAO][n];
+    double fitness[TAM_POPULACAO];
 
     // Gerar a população inicial
     for (int i = 0; i < TAM_POPULACAO; i++) {
-        gerar_individuo_aleatorio(populacao[i]);
+        gerar_individuo_benchmark(populacao[i], n, min, max);
     }
 
     // Evolução do algoritmo genético
     for (int geracao = 0; geracao < NUM_GERACOES; geracao++) {
         // Avaliar a população
-        avaliar_populacao(populacao, fitness);
+        for (int i = 0; i < TAM_POPULACAO; i++) {
+            fitness[i] = calcular_fitness_benchmark(populacao[i], n, tipo_funcao);
+        }
 
-        // Encontrar o melhor fitness da geração atual
-        int melhor_fitness = fitness[0];
+        // Encontrar o melhor fitness
+        double melhor_fitness = fitness[0];
         for (int i = 1; i < TAM_POPULACAO; i++) {
             if (fitness[i] < melhor_fitness) {
                 melhor_fitness = fitness[i];
             }
         }
 
-        // Registrar o melhor fitness no arquivo
-        fprintf(arquivo_dados, "%d,%d\n", geracao, melhor_fitness);
+        // Exibir o melhor fitness da geração atual
+        printf("Geração %d - Melhor fitness: %.5f\n", geracao, melhor_fitness);
 
-        // Exibir o melhor fitness da geração atual no terminal
-        printf("Geração %d - Melhor fitness: %d\n", geracao, melhor_fitness);
+        // Cruzamento e Mutação
+        for (int i = 0; i < TAM_POPULACAO; i += 2) {
+            int pai1 = selecionar_individuo(fitness, TAM_POPULACAO);
+            int pai2 = selecionar_individuo(fitness, TAM_POPULACAO);
 
-        // Gerar nova geração
-        nova_geracao(populacao, fitness);
+            // Cruzamento
+            cruzar_individuos(populacao[pai1], populacao[pai2], nova_populacao[i], nova_populacao[i+1], n);
+
+            // Mutação
+            mutar_individuo(nova_populacao[i], n, TAXA_MUTACAO, min, max);
+            mutar_individuo(nova_populacao[i+1], n, TAXA_MUTACAO, min, max);
+        }
+
+        // Substituir a população antiga pela nova
+        for (int i = 0; i < TAM_POPULACAO; i++) {
+            for (int j = 0; j < n; j++) {
+                populacao[i][j] = nova_populacao[i][j];
+            }
+        }
     }
-
-    // Fechar o arquivo de dados
-    fclose(arquivo_dados);
-
-    // Medir o tempo total de execução
-    clock_t fim = clock();
-    double tempo_total = medir_tempo(inicio, fim);
-    printf("Tempo total de execução: %.2f segundos\n", tempo_total);
 
     return 0;
 }
