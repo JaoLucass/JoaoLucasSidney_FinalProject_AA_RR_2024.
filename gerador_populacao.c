@@ -2,65 +2,97 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define NUM_VERTICES 7  // Número de nós
-#define NUM_ARESTAS 12  // Número de arestas (isso representa o número total de conexões únicas)
+#define MAX_POPULACOES 1000  // Número de populações a serem geradas
+#define MIN_TAMANHO 10       // Tamanho mínimo da população e número de vértices
+#define MAX_TAMANHO 1000     // Tamanho máximo da população e número de vértices
+#define MIN_VERTICES 10      // Número mínimo de vértices (dimensões)
+#define MAX_VERTICES 1000    // Número máximo de vértices (dimensões)
 
-int arestas[NUM_ARESTAS][2] = {
-    {0, 1}, {0, 2}, {0, 3}, {0, 6},
-    {1, 6}, {1, 2}, {1, 3},
-    {2, 5}, {2, 4},
-    {3, 6}, {5, 4},
-    {6, 5}
-};
-
-// Função para gerar pesos aleatórios para os nós
-void gerar_pesos_aleatorios(int pesos[NUM_VERTICES]) {
-    for (int i = 0; i < NUM_VERTICES; i++) {
-        pesos[i] = rand() % 10 + 1;  // Peso aleatório entre 1 e 10
+// Função para gerar um indivíduo aleatório
+void gerar_individuo(double *individuo, int n, double min, double max) {
+    for (int i = 0; i < n; i++) {
+        individuo[i] = min + ((double)rand() / RAND_MAX) * (max - min);  // Gera números entre [min, max]
     }
 }
 
-// Função para gerar um arquivo de população com base nos nós e arestas
-void gerar_arquivo_populacao(const char* nome_arquivo) {
-    FILE *arquivo = fopen(nome_arquivo, "w");
-    if (arquivo == NULL) {
-        printf("Erro ao abrir o arquivo!\n");
-        return;
+// Função para gerar uma população
+void gerar_populacao(double **populacao, int tamanho_populacao, int n, double min, double max) {
+    for (int i = 0; i < tamanho_populacao; i++) {
+        gerar_individuo(populacao[i], n, min, max);
     }
+}
 
-    // Escrever número de nós e arestas no arquivo
-    fprintf(arquivo, "%d\n", NUM_VERTICES);
-    fprintf(arquivo, "%d\n", 2 * NUM_ARESTAS);  // Para garantir não-direcionamento, dobraremos o número de arestas
-
-    // Gerar pesos aleatórios para os nós
-    int pesos[NUM_VERTICES];
-    gerar_pesos_aleatorios(pesos);
-
-    // Escrever pesos dos nós no arquivo
-    for (int i = 0; i < NUM_VERTICES; i++) {
-        fprintf(arquivo, "%d %d\n", i, pesos[i]);
+// Função para salvar uma população no arquivo
+void salvar_populacao(FILE *arquivo, double **populacao, int tamanho_populacao, int n, int num_populacao) {
+    fprintf(arquivo, "População %d - Tamanho: %d, Vértices: %d\n", num_populacao, tamanho_populacao, n);
+    for (int i = 0; i < tamanho_populacao; i++) {
+        for (int j = 0; j < n; j++) {
+            fprintf(arquivo, "%.5f ", populacao[i][j]);
+        }
+        fprintf(arquivo, "\n");
     }
+    fprintf(arquivo, "\n");
+}
 
-    // Escrever arestas no arquivo (incluindo ambas as direções para garantir grafo não direcionado)
-    for (int i = 0; i < NUM_ARESTAS; i++) {
-        int v1 = arestas[i][0];
-        int v2 = arestas[i][1];
-        
-        // Adicionar a aresta v1 -> v2
-        fprintf(arquivo, "%d %d\n", v1, v2);
-        // Adicionar a aresta v2 -> v1 (garantindo simetria)
-        fprintf(arquivo, "%d %d\n", v2, v1);
+// Função para verificar se a combinação de tamanho de população e vértices já foi usada
+int combinacao_usada(int tamanho_populacao, int n, int combinacoes[MAX_POPULACOES][2], int num_combinacoes) {
+    for (int i = 0; i < num_combinacoes; i++) {
+        if (combinacoes[i][0] == tamanho_populacao && combinacoes[i][1] == n) {
+            return 1;  // Combinação já usada
+        }
     }
-
-    fclose(arquivo);
-    printf("Arquivo de população gerado com sucesso: %s\n", nome_arquivo);
+    return 0;  // Combinação nova
 }
 
 int main() {
-    srand(time(NULL));  // Semente para gerar números aleatórios
+    srand(time(NULL));  // Semente para geração de números aleatórios
 
-    // Gerar arquivo com a população
-    gerar_arquivo_populacao("populacao.txt");
+    double min_val = -5.12, max_val = 5.12;  // Limites para os valores dos vértices
+    int combinacoes[MAX_POPULACOES][2];      // Armazena combinações já usadas (tamanho da população e vértices)
+    int num_combinacoes = 0;                 // Contador de combinações únicas
+
+    // Abrir arquivo para salvar populações
+    FILE *arquivo = fopen("populacao.txt", "w");
+    if (arquivo == NULL) {
+        printf("Erro ao abrir o arquivo populacao.txt!\n");
+        return 1;
+    }
+
+    for (int p = 0; p < MAX_POPULACOES; p++) {
+        int tamanho_populacao, num_vertices;
+
+        // Gerar combinações únicas de tamanho da população e número de vértices
+        do {
+            tamanho_populacao = MIN_TAMANHO + rand() % (MAX_TAMANHO - MIN_TAMANHO + 1);  // Tamanho da população aleatório entre 10 e 1000
+            num_vertices = MIN_VERTICES + rand() % (MAX_VERTICES - MIN_VERTICES + 1);    // Número de vértices aleatório entre 10 e 1000
+        } while (combinacao_usada(tamanho_populacao, num_vertices, combinacoes, num_combinacoes));
+
+        // Armazenar a combinação única
+        combinacoes[num_combinacoes][0] = tamanho_populacao;
+        combinacoes[num_combinacoes][1] = num_vertices;
+        num_combinacoes++;
+
+        // Alocar memória para a população
+        double **populacao = (double **)malloc(tamanho_populacao * sizeof(double *));
+        for (int i = 0; i < tamanho_populacao; i++) {
+            populacao[i] = (double *)malloc(num_vertices * sizeof(double));
+        }
+
+        // Gerar a população e salvar no arquivo
+        gerar_populacao(populacao, tamanho_populacao, num_vertices, min_val, max_val);
+        salvar_populacao(arquivo, populacao, tamanho_populacao, num_vertices, p + 1);
+
+        // Liberar a memória da população
+        for (int i = 0; i < tamanho_populacao; i++) {
+            free(populacao[i]);
+        }
+        free(populacao);
+    }
+
+    // Fechar o arquivo
+    fclose(arquivo);
+
+    printf("1000 populações geradas e salvas no arquivo populacao.txt.\n");
 
     return 0;
 }
