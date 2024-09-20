@@ -103,11 +103,35 @@ int main() {
     int n = 5;  // Dimensão do problema (número de vértices ou variáveis)
     double min = -5.12;  // Limite inferior do intervalo
     double max = 5.12;   // Limite superior do intervalo
-    int tipo_funcao = 3; // Função de benchmark a ser usada (1: Sphere, 2: Rosenbrock, 3: Rastrigin, 4: Ackley)
-    
+    int tipo_funcao;     // Função de benchmark escolhida pelo usuário
+
+    // Perguntar ao usuário qual função de benchmark usar
+    printf("Escolha a função de benchmark:\n");
+    printf("1. Sphere Function\n");
+    printf("2. Rosenbrock Function\n");
+    printf("3. Rastrigin Function\n");
+    printf("4. Ackley Function\n");
+    printf("Digite o número da função escolhida: ");
+    scanf("%d", &tipo_funcao);
+
+    if (tipo_funcao < 1 || tipo_funcao > 4) {
+        printf("Escolha inválida! Usando Sphere Function por padrão.\n");
+        tipo_funcao = 1;  // Se a escolha for inválida, usar Sphere como padrão
+    }
+
     double populacao[TAM_POPULACAO][n];
     double nova_populacao[TAM_POPULACAO][n];
     double fitness[TAM_POPULACAO];
+
+    // Abrir o arquivo CSV para salvar os dados de fitness
+    FILE *arquivo_dados = fopen("fitness_data.csv", "w");
+    if (arquivo_dados == NULL) {
+        printf("Erro ao abrir o arquivo fitness_data.csv!\n");
+        return 1;
+    }
+
+    // Escrever o cabeçalho do CSV
+    fprintf(arquivo_dados, "Geracao,Melhor_Fitness\n");
 
     // Gerar a população inicial
     for (int i = 0; i < TAM_POPULACAO; i++) {
@@ -132,6 +156,9 @@ int main() {
         // Exibir o melhor fitness da geração atual
         printf("Geração %d - Melhor fitness: %.5f\n", geracao, melhor_fitness);
 
+        // Salvar o melhor fitness no arquivo CSV
+        fprintf(arquivo_dados, "%d,%.5f\n", geracao, melhor_fitness);
+
         // Cruzamento e Mutação
         for (int i = 0; i < TAM_POPULACAO; i += 2) {
             int pai1 = selecionar_individuo(fitness, TAM_POPULACAO);
@@ -152,6 +179,11 @@ int main() {
             }
         }
     }
+
+    // Fechar o arquivo CSV
+    fclose(arquivo_dados);
+
+    printf("Dados de fitness salvos no arquivo fitness_data.csv.\n");
 
     return 0;
 }
