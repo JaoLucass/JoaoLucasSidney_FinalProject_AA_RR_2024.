@@ -4,9 +4,9 @@
 
 #define MAX_POPULACOES 1000  // Número de populações a serem geradas
 #define MIN_TAMANHO 10       // Tamanho mínimo da população e número de vértices
-#define MAX_TAMANHO 1000     // Tamanho máximo da população e número de vértices
+#define MAX_TAMANHO 200      // Reduzido para 200 para evitar problemas de memória
 #define MIN_VERTICES 10      // Número mínimo de vértices (dimensões)
-#define MAX_VERTICES 1000    // Número máximo de vértices (dimensões)
+#define MAX_VERTICES 200     // Reduzido para 200 para evitar problemas de memória
 
 // Função para gerar um indivíduo aleatório
 void gerar_individuo(double *individuo, int n, double min, double max) {
@@ -63,8 +63,8 @@ int main() {
 
         // Gerar combinações únicas de tamanho da população e número de vértices
         do {
-            tamanho_populacao = MIN_TAMANHO + rand() % (MAX_TAMANHO - MIN_TAMANHO + 1);  // Tamanho da população aleatório entre 10 e 1000
-            num_vertices = MIN_VERTICES + rand() % (MAX_VERTICES - MIN_VERTICES + 1);    // Número de vértices aleatório entre 10 e 1000
+            tamanho_populacao = MIN_TAMANHO + rand() % (MAX_TAMANHO - MIN_TAMANHO + 1);  // Tamanho da população aleatório entre 10 e 200
+            num_vertices = MIN_VERTICES + rand() % (MAX_VERTICES - MIN_VERTICES + 1);    // Número de vértices aleatório entre 10 e 200
         } while (combinacao_usada(tamanho_populacao, num_vertices, combinacoes, num_combinacoes));
 
         // Armazenar a combinação única
@@ -74,8 +74,17 @@ int main() {
 
         // Alocar memória para a população
         double **populacao = (double **)malloc(tamanho_populacao * sizeof(double *));
+        if (populacao == NULL) {
+            printf("Erro na alocação de memória para a população.\n");
+            return 1;
+        }
+
         for (int i = 0; i < tamanho_populacao; i++) {
             populacao[i] = (double *)malloc(num_vertices * sizeof(double));
+            if (populacao[i] == NULL) {
+                printf("Erro na alocação de memória para o indivíduo %d da população %d.\n", i, p+1);
+                return 1;
+            }
         }
 
         // Gerar a população e salvar no arquivo
@@ -92,7 +101,8 @@ int main() {
     // Fechar o arquivo
     fclose(arquivo);
 
-    printf("1000 populações geradas e salvas no arquivo populacao.txt.\n");
+    printf("Populações geradas e salvas no arquivo populacao.txt.\n");
 
     return 0;
 }
+

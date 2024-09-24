@@ -24,7 +24,7 @@ No terminal, navegue até o diretório onde os arquivos .c estão localizados e 
 ```bash
 comando para compilar os arquivos .c
 gcc gerador_populacao.c -o gerador_populacao
-gcc algoritmo_genetico.c -o algoritmo_genetico
+gcc algoritmo_genetico.c -o algoritmo_genetico -lm
 
 ./gerador_populacao #este criara o arquivo populacao.txt
 ./algoritmo_genetico #Vai trabalhar com os dados de populacao_inicial.txt e depois criara fitness_data.csv
